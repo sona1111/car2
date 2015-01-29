@@ -1,0 +1,6 @@
+package car;
+
+message Command {
+    required string name = 1;
+    optional float value = 2;
+}

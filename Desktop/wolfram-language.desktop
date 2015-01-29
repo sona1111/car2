@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=Wolfram
+Comment=Technical Programming Environment
+Exec=x-terminal-emulator -t "Wolfram Language" -e wolfram
+Icon=wolfram-language
+Type=Application
+Categories=Application;Education;Development;
+StartupNotify=true

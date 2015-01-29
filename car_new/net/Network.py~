@@ -1,0 +1,78 @@
+from car_pb2 import Info
+from car_pb2 import Command
+import socket
+import time
+from threading import Thread
+
+UDP_PORT_INCOMING = 7777
+UDP_PORT_OUTGOING = 7778
+REMOTE_ADDRESS = 'localhost'
+SUPPORTED_PROTO_INFO = ['lsens','rsens','fsens','bsens'] #the info supported in the info protocol
+
+	
+class NetworkCommandListner(object):
+
+    def __init__(self, hardware):
+        
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)	
+        self.csocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.bind(('', UDP_PORT_INCOMING))
+        print "UDP Server Operational, waiting for connections incoming on port %d, outgoing on port %d" % (UDP_PORT_INCOMING, UDP_PORT_OUTGOING)
+        self.info = Info()
+        self.cmd = Command()
+        self.network_direct = False
+        self.running = True
+        self.hw = hardware
+        self.net_th = Thread(target = self.listen_th)
+        self.net_th.setDaemon(True)
+        self.net_th.start()
+        
+    def hasRequest(self):
+        if self.network_direct == True:
+            return True
+        else:
+            return False
+        
+    def run_direct(self):
+        if self.network_direct == False:
+            print "network command received but network direct currently disabled"
+        else:
+            print "network command received, %s ; executing..." % (self.cmd.name)
+            if self.cmd.name == 'stop':
+                self.hw['mainEngine'].rotate(0)
+            elif self.cmd.name == 'go':
+                self.hw['mainEngine'].rotate(self.cmd.value)
+        
+    def sendInfo(self, info):
+        
+        nSuccess = 0
+        for name in info:
+            if name in SUPPORTED_PROTO_INFO:
+                setattr(self.info, name, info[name])
+                nSuccess += 1
+        if nSuccess > 0:
+            self.send(self.info.SerializeToString())
+        
+    def send(self, data):
+        self.csocket.sendto(data, (REMOTE_ADDRESS, UDP_PORT_OUTGOING))
+        
+    def listen_th(self):
+    
+        while self.running == True:
+        
+            dataFromClient, address = self.socket.recvfrom(6000) # blocks until packet received
+            self.cmd.ParseFromString(dataFromClient)
+            if self.cmd.name == "SIG_DIRECT_ENABLE":
+                self.network_direct = True
+                print "Direct network-to-hardware enabled"
+            elif self.cmd.name == "SIG_DIRECT_DISABLE":
+                self.network_direct = False
+                print "Direct network-to-hardware disabled"
+            else:
+                self.run_direct()
+	
+if __name__ == "__main__":
+
+    test = NetworkCommandListner(None)
+    test.sendInfo({'bsens':0.432,'fsens':4.432,'rsens':93.432,'lsens':41293.432})
+    time.sleep(700)

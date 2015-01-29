@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Mathematica
+Comment=Technical Computing System
+TryExec=mathematica
+Exec=/opt/Wolfram/WolframEngine/10.0/Executables/mathematica %F
+Icon=wolfram-mathematica
+MimeType=application/mathematica;application/vnd.wolfram.cdf;application/mathematicaplayer  
+Categories=Application;Education;

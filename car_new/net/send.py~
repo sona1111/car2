@@ -1,0 +1,13 @@
+
+import car_pb2
+import socket
+
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+cmd = car_pb2.Command()
+
+cmd.name = "SIG_DIRECT_sdaf"
+cmd.value = 0.832
+
+client_socket.sendto(cmd.SerializeToString(), ("localhost",7777))
+
+client_socket.close()

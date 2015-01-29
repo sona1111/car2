@@ -1,0 +1,181 @@
+import time
+import RPi.GPIO as GPIO
+
+#set GPIO mode
+GPIO.setmode(GPIO.BCM)
+
+#Defining Costants
+Pins = {'P0':(11,17),'P1':(12,18),'P2':(13,21),'P3':(15,22),'P4':(16,23),'P5':(18,24),'P6':(22,25),'P7':(7,4),
+'CE1':(26,0),'CE0':(24,0),'SCLK':(23,0),'MISO':(21,0),'MOSI':(19,0),'RDX':(10,0),'TDX':(8,0),'SCL':(5,0),'SDA':(3,0)}
+
+
+#engine values for the specific car(values are in voltage)
+PowerEngine = {"forward":0.25,"backwards":0.35,"stop":0.3}
+SteeringEngine = {"left":0.25,"right":0.35,"center":0.3}
+#Raspberry Pi Constant voltage out value
+RaspberryPiVout = 3.3
+
+class Hardware(object):
+
+    def __init__(self, Type, pinsIn, pinsOut):
+        
+        #set Pins array
+        self.pinsIn = pinsIn
+        self.pinsOut = pinsOut
+        self.initPins()
+        #count amount of Pins
+        self.numPinsIn = len(pinsIn)
+        self.numPinsOut = len(pinsOut)
+
+        # set specific type of hardware variables 
+        if (Type == "pwm"):
+            self.frequency = 1000            
+            self.p = GPIO.PWM(self.pinsOut[0], self.frequency)
+        if (Type == "sensor"):  
+            pass
+            
+    #set the values of the pins on the PI
+    def initPins(self):
+        
+        for i in self.pinsIn:
+            GPIO.setup(i,GPIO.IN)
+    
+        for o in self.pinsOut:
+            GPIO.setup(o,GPIO.OUT)    
+            GPIO.output(o, GPIO.LOW)
+            
+    #sends the desired / required voltage using pulse with modulation
+    def pwm(self, voltage):
+      
+      	
+        VPercent = voltage*100/RaspberryPiVout
+        print VPercent
+        self.p.ChangeDutyCycle(VPercent)
+        
+    
+
+class UsonicSens(Hardware):
+    
+    def __init__(self,pinsIn,pinsOut):        #saves the values of the pins and other constants
+    
+        super(UsonicSens, self).__init__("sensor",pinsIn, pinsOut)
+        
+        self.decPulseTrigger = 0.0001 
+        self.inttimeout = 2100
+        self.lastReading = 0
+
+        time.sleep(0.3)
+        
+        
+    def sens(self):
+		
+		print "Entering Sensing...."
+
+		# Trigger high for 0.0001s then low
+		GPIO.output(self.pinsOut[0], True)
+		time.sleep(self.decPulseTrigger)
+		GPIO.output(self.pinsOut[0], False)
+
+		# Wait for echo to go high (or timeout)
+		intcountdown = self.inttimeout
+
+		while (GPIO.input(self.pinsIn[0]) == 0 and intcountdown > 0):
+			intcountdown = intcountdown - 1
+
+		# If echo is high
+		if intcountdown > 0:
+
+			# Start timer and init timeout countdown
+			echostart = time.time()
+			intcountdown = self.inttimeout
+
+		# Wait for echo to go low (or timeout)
+			while (GPIO.input(self.pinsIn[0]) == 1 and intcountdown > 0):
+				intcountdown = intcountdown - 1
+
+			# Stop timer
+			echoend = time.time()
+
+			# Echo duration
+			echoduration = echoend - echostart
+
+
+			# Display distance
+			if intcountdown > 0:
+				intdistance = (echoduration*1000000)/58
+				self.lastReading = intdistance
+	
+		else:
+			self.lastReading = -1
+		# Wait at least .01s before re trig (or in this case .1s)            
+		time.sleep(.5)
+
+    def getReading(self):
+        print self.lastReading
+        return self.lastReading
+
+
+ 
+
+class PowerEngine2(Hardware):
+    
+    def __init__(self,pinsIn,pinsOut):
+        super(PowerEngine2, self).__init__("pwm",pinsIn, pinsOut)
+        self.pinsIn = pinsIn
+        self.pinsOut = pinsOut
+    
+    def rotate(self,speedPercent):
+    	
+        print	self.convertToVolt(speedPercent)
+        #self.pwm(self.convertToVolt(speedPercent))
+    	self.pwm(50.0)
+    
+    '''
+    def printReport(self):
+        for name, data in self.mSteering.iteritems():
+            print name + " " + str(data)
+        for name, data in self.mMotor.iteritems():
+            print name + " " + str(data)
+           ''' 
+            
+          
+    def convertToVolt(self, value):
+        
+        if (value >= -100.0 and value < 0.0):        
+            return (((PowerEngine['backwards'] - PowerEngine['stop'])/100)*(-value))+PowerEngine['stop']
+        
+        elif (value <= 100.0 and value > 0.0):
+            return PowerEngine['stop']-(((PowerEngine['stop'] - PowerEngine['forward'])/100)*value)
+            
+        else:
+            return PowerEngine['stop']
+
+class SteeringEngine(Hardware):
+    
+    def __init__(self,pinsIn,pinsOut):
+        super(SteeringEngine, self).__init__("pwm",pinsIn, pinsOut)  
+    
+    def rotate(self,speedPercent):
+        self.pwm(self.convertToVolt(speedPercent))
+    
+    
+    '''
+    def printReport(self):
+        for name, data in self.mSteering.iteritems():
+            print name + " " + str(data)
+        for name, data in self.mMotor.iteritems():
+            print name + " " + str(data)
+     '''       
+            
+          
+    def convertToVolt(self, value):
+        
+        if (value >= -100.0 and value < 0.0):        
+            return (((SteeringEngine['right'] - SteeringEngine['center'])/100)*(-value))+SteeringEngine['center']
+        
+        elif (value <= 100.0 and value > 0.0):
+            return SteeringEngine['center']-(((SteeringEngine['center'] - SteeringEngine['left'])/100)*value)
+            
+        else:
+            return SteeringEngine['center']
+    
